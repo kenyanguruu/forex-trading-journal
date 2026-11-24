@@ -1,0 +1,234 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+Trade Details | Forex Trading Journal
+{% endblock %}
+
+{% block content %}
+
+<section class="form-section">
+
+    <div class="page-heading">
+        <div>
+            <h2>Trade Details</h2>
+            <p>Complete information about this trade.</p>
+        </div>
+
+        <a href="{{ url_for('view_trades') }}"
+           class="secondary-button">
+            Back to Trades
+        </a>
+    </div>
+
+    <!-- TRADE SUMMARY -->
+
+    <div class="trade-summary">
+
+        <div class="summary-card">
+            <span>Trading Instrument</span>
+            <strong>{{ trade["Pair"] }}</strong>
+        </div>
+
+        <div class="summary-card">
+            <span>Direction</span>
+            <strong class="direction {{ trade['Direction']|lower }}">
+                {{ trade["Direction"] }}
+            </strong>
+        </div>
+
+        <div class="summary-card">
+            <span>Trade Result</span>
+            <strong class="result {{ trade['Results']|lower }}">
+                {{ trade["Results"] }}
+            </strong>
+        </div>
+
+        <div class="summary-card">
+            <span>Profit / Loss</span>
+            <strong>
+                ${{ "%.2f"|format(trade["Profit/Loss"]|float) }}
+            </strong>
+        </div>
+
+    </div>
+
+    <!-- BROKER INFORMATION -->
+
+    <div class="trade-filter-section">
+
+        <h3>Broker Information</h3>
+
+        <div class="trade-summary">
+
+            <div class="summary-card">
+                <span>Broker</span>
+                <strong>{{ trade.get("Broker") or "Not recorded" }}</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Account Type</span>
+                <strong>{{ trade.get("Account Type") or "Not recorded" }}</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Broker Entity</span>
+                <strong>{{ trade.get("Broker Entity") or "Not recorded" }}</strong>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- PRICE INFORMATION -->
+
+    <div class="trade-filter-section">
+
+        <h3>Trade Price Information</h3>
+
+        {% set symbol = trade["Pair"]|upper %}
+        {% set base_symbol = symbol[:-1] if symbol.endswith("C") else symbol %}
+
+        {% set decimals = 5 %}
+
+        {% if base_symbol == "XAUUSD" %}
+            {% set decimals = 2 %}
+        {% elif base_symbol == "XAGUSD" %}
+            {% set decimals = 3 %}
+        {% elif base_symbol.endswith("JPY") %}
+            {% set decimals = 3 %}
+        {% endif %}
+
+        {% set saved_decimals = trade.get("Price Decimals") %}
+
+        {% if saved_decimals is not none and saved_decimals|string|trim != "" %}
+            {% set decimals = saved_decimals|int %}
+        {% endif %}
+
+        {% set price_format = "%." ~ decimals|string ~ "f" %}
+
+        <div class="trade-summary">
+
+            <div class="summary-card">
+                <span>Entry Price</span>
+                <strong>{{ price_format|format(trade["Entry Price"]|float) }}</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Exit Price</span>
+                <strong>{{ price_format|format(trade["Exit Price"]|float) }}</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Stop Loss</span>
+                <strong>{{ price_format|format(trade["Stop loss"]|float) }}</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Take Profit</span>
+                <strong>{{ price_format|format(trade["Take profit"]|float) }}</strong>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- POSITION INFORMATION -->
+
+    <div class="trade-filter-section">
+
+        <h3>Position Information</h3>
+
+        <div class="trade-summary">
+
+            <div class="summary-card">
+                <span>Lot Size</span>
+                <strong>{{ "%.3f"|format(trade["Lot Size"]|float) }}</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Contract Size</span>
+                <strong>{{ trade.get("Contract Size") or "Not recorded" }}</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Risk Percentage</span>
+                <strong>{{ trade["Risk percentage"] }}%</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Risk-to-Reward</span>
+                <strong>{{ "%.2f"|format(trade["Risk-to-Reward"]|float) }}</strong>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- FINANCIAL INFORMATION -->
+
+    <div class="trade-filter-section">
+
+        <h3>Financial Information</h3>
+
+        <div class="trade-summary">
+
+            <div class="summary-card">
+                <span>Quote-to-USD Conversion Rate</span>
+                <strong>
+                    {{ trade.get("Quote-to-USD Conversion Rate") or "Not recorded" }}
+                </strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Profit / Loss</span>
+                <strong>
+                    ${{ "%.2f"|format(trade["Profit/Loss"]|float) }}
+                </strong>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- DATE AND TIME -->
+
+    <div class="trade-filter-section">
+
+        <h3>Trade Date and Time</h3>
+
+        <div class="trade-summary">
+
+            <div class="summary-card">
+                <span>Trade Date</span>
+                <strong>{{ trade["Trade Date"] }}</strong>
+            </div>
+
+            <div class="summary-card">
+                <span>Trade Time</span>
+                <strong>{{ trade["Trade Time"] }}</strong>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ACTIONS -->
+
+    <div class="filter-actions">
+
+        <a href="{{ url_for('edit_trade', trade_id=trade['Trade ID']) }}"
+           class="edit-button">
+            Edit Trade
+        </a>
+
+        <a href="{{ url_for('view_trades') }}"
+           class="secondary-button">
+            Back to Trades
+        </a>
+
+    </div>
+
+</section>
+
+{% endblock %}

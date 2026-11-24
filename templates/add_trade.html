@@ -1,0 +1,680 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+Add Trade | Forex Trading Journal
+{% endblock %}
+
+{% block content %}
+
+<section class="form-section">
+    <h2>Add New Trade</h2>
+
+    <form method="POST" action="{{ url_for('add_trade') }}" id="trade-form">
+
+        <div class="form-group">
+            <label for="broker">Broker</label>
+
+            <select id="broker" name="broker" required>
+                {% for broker_item in brokers %}
+                <option
+                    value="{{ broker_item.id }}"
+                    {% if broker_item.id == selected_broker %}selected{% endif %}
+                >
+                    {{ broker_item.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="account_type">Account Type</label>
+
+            <select id="account_type" name="account_type" required>
+                {% for account in accounts %}
+                <option value="{{ account.account_type_id }}">
+                    {{ account.account_type_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="broker_entity">Broker Entity</label>
+
+            <select id="broker_entity" name="broker_entity" required>
+                {% for entity_item in entities %}
+                <option value="{{ entity_item.id }}">
+                    {{ entity_item.name }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <small>
+                Select the legal entity under which your account is registered.
+            </small>
+        </div>
+
+        <div class="form-group instrument-search">
+            <label for="instrument_search">Trading Instrument</label>
+
+            <input
+                type="text"
+                id="instrument_search"
+                placeholder="Search EURUSD, Gold, Bitcoin..."
+                autocomplete="off"
+                required
+            >
+
+            <input type="hidden" id="pair" name="pair">
+
+            <div id="instrument-suggestions" class="instrument-suggestions"></div>
+
+            <small id="selected-instrument">
+                Select your broker and search for an instrument.
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label for="contract_size_display">Contract Size (Automatic)</label>
+            <input
+                type="text"
+                id="contract_size_display"
+                readonly
+                placeholder="Select an instrument first"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="minimum_lot_display">Minimum Lot Size</label>
+            <input
+                type="text"
+                id="minimum_lot_display"
+                readonly
+                placeholder="Select an instrument first"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="direction">Trade Direction</label>
+
+            <select id="direction" name="direction" required>
+                <option value="">Select Direction</option>
+                <option value="BUY">BUY</option>
+                <option value="SELL">SELL</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="entry_price">Entry Price</label>
+            <input
+                type="text"
+                inputmode="decimal"
+                id="entry_price"
+                name="entry_price"
+                autocomplete="off"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="exit_price">Exit Price</label>
+            <input
+                type="text"
+                inputmode="decimal"
+                id="exit_price"
+                name="exit_price"
+                autocomplete="off"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="lot_size">Lot Size</label>
+            <input
+                type="number"
+                id="lot_size"
+                name="lot_size"
+                step="any"
+                min="0"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="risk_percentage">Risk Percentage</label>
+            <input
+                type="number"
+                id="risk_percentage"
+                name="risk_percentage"
+                step="any"
+                min="0"
+                max="100"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="stop_loss">Stop Loss</label>
+            <input
+                type="text"
+                inputmode="decimal"
+                id="stop_loss"
+                name="stop_loss"
+                autocomplete="off"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="take_profit">Take Profit</label>
+            <input
+                type="text"
+                inputmode="decimal"
+                id="take_profit"
+                name="take_profit"
+                autocomplete="off"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="conversion_rate">
+                Quote Currency to USD Conversion Rate
+            </label>
+
+            <input
+                type="number"
+                id="conversion_rate"
+                name="conversion_rate"
+                step="any"
+                min="0"
+                value="1"
+                required
+            >
+
+            <small>Automatic historical conversion will be added later.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="trade_date">Trade Date</label>
+            <input type="date" id="trade_date" name="trade_date" required>
+        </div>
+
+        <div class="form-group">
+            <label for="trade_time">Trade Time</label>
+            <input type="time" id="trade_time" name="trade_time" required>
+        </div>
+
+        <button type="submit">Save Trade</button>
+
+    </form>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const broker = document.getElementById("broker");
+    const accountType = document.getElementById("account_type");
+    const entity = document.getElementById("broker_entity");
+
+    const searchInput = document.getElementById("instrument_search");
+    const pairInput = document.getElementById("pair");
+    const suggestions = document.getElementById("instrument-suggestions");
+    const selectedInstrument = document.getElementById("selected-instrument");
+
+    const contractDisplay = document.getElementById("contract_size_display");
+    const minimumLotDisplay = document.getElementById("minimum_lot_display");
+
+    const lotInput = document.getElementById("lot_size");
+    const conversionInput = document.getElementById("conversion_rate");
+
+    const tradeForm = document.getElementById("trade-form");
+
+    const priceInputs = [
+        document.getElementById("entry_price"),
+        document.getElementById("exit_price"),
+        document.getElementById("stop_loss"),
+        document.getElementById("take_profit")
+    ];
+
+    let searchTimeout;
+    let selectedSpec = null;
+    let priceDecimals = null;
+
+
+    // Format a price using the selected instrument's precision.
+    function formatPrice(input) {
+
+        if (priceDecimals === null || input.value.trim() === "") {
+            return;
+        }
+
+        const value = Number(input.value);
+
+        if (!Number.isFinite(value)) {
+            return;
+        }
+
+        input.value = value.toFixed(priceDecimals);
+    }
+
+
+    // Apply price formatting when the user leaves a price field.
+    priceInputs.forEach(function (input) {
+
+        input.addEventListener("blur", function () {
+            formatPrice(input);
+        });
+
+    });
+
+
+    // Clear the selected instrument and its related price information.
+    function clearSelection() {
+
+        pairInput.value = "";
+        selectedSpec = null;
+        priceDecimals = null;
+
+        contractDisplay.value = "";
+        minimumLotDisplay.value = "";
+
+        lotInput.value = "";
+        lotInput.removeAttribute("min");
+
+        priceInputs.forEach(function (input) {
+            input.value = "";
+        });
+
+        selectedInstrument.textContent =
+            "Search and select an available instrument.";
+
+    }
+
+
+    function clearSearch() {
+
+        clearTimeout(searchTimeout);
+        suggestions.innerHTML = "";
+        clearSelection();
+
+    }
+
+
+    // Load account types whenever the broker changes.
+    broker.addEventListener("change", async function () {
+
+        accountType.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Loading account types...";
+
+        accountType.appendChild(placeholder);
+        accountType.disabled = true;
+
+        try {
+
+            const response = await fetch(
+                `/api/account-types/${encodeURIComponent(broker.value)}`
+            );
+
+            if (!response.ok) {
+                throw new Error("Unable to load account types.");
+            }
+
+            const accounts = await response.json();
+
+            accountType.innerHTML = "";
+
+            if (accounts.length === 0) {
+
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "No account types available";
+
+                accountType.appendChild(option);
+                return;
+
+            }
+
+            accounts.forEach(function (account) {
+
+                const option = document.createElement("option");
+
+                option.value = account.account_type_id;
+                option.textContent = account.account_type_name;
+
+                accountType.appendChild(option);
+
+            });
+
+        } catch (error) {
+
+            accountType.innerHTML = "";
+
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "Failed to load account types";
+
+            accountType.appendChild(option);
+
+            console.error(error);
+
+        } finally {
+
+            accountType.disabled = false;
+
+        }
+
+    });
+
+
+    // Load broker entities whenever the broker changes.
+    broker.addEventListener("change", async function () {
+
+        entity.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Loading broker entities...";
+
+        entity.appendChild(placeholder);
+        entity.disabled = true;
+
+        try {
+
+            const response = await fetch(
+                `/api/broker-entities/${encodeURIComponent(broker.value)}`
+            );
+
+            if (!response.ok) {
+                throw new Error("Unable to load broker entities.");
+            }
+
+            const entities = await response.json();
+
+            entity.innerHTML = "";
+
+            if (entities.length === 0) {
+
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "No entities available";
+
+                entity.appendChild(option);
+                return;
+
+            }
+
+            entities.forEach(function (item) {
+
+                const option = document.createElement("option");
+
+                option.value = item.id;
+                option.textContent = item.name;
+
+                entity.appendChild(option);
+
+            });
+
+        } catch (error) {
+
+            entity.innerHTML = "";
+
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "Failed to load entities";
+
+            entity.appendChild(option);
+
+            console.error(error);
+
+        } finally {
+
+            entity.disabled = false;
+
+        }
+
+    });
+
+
+    // Changing broker settings clears the previous instrument.
+    [broker, accountType, entity].forEach(function (control) {
+
+        control.addEventListener("change", function () {
+
+            searchInput.value = "";
+            clearSearch();
+
+        });
+
+    });
+
+
+    // Search for instruments using the selected broker settings.
+    searchInput.addEventListener("input", function () {
+
+        const query = searchInput.value.trim();
+
+        clearSelection();
+
+        clearTimeout(searchTimeout);
+        suggestions.innerHTML = "";
+
+        if (!query) {
+            return;
+        }
+
+        searchTimeout = setTimeout(async function () {
+
+            try {
+
+                const params = new URLSearchParams({
+                    q: query,
+                    broker_id: broker.value,
+                    account_type_id: accountType.value,
+                    entity_id: entity.value
+                });
+
+                const response = await fetch(
+                    `/api/instruments?${params.toString()}`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Instrument search failed.");
+                }
+
+                const instruments = await response.json();
+
+                suggestions.innerHTML = "";
+
+                if (instruments.length === 0) {
+
+                    suggestions.textContent =
+                        "No verified instruments available for this account.";
+
+                    return;
+
+                }
+
+
+                instruments.forEach(function (instrument) {
+
+                    const option = document.createElement("button");
+
+                    option.type = "button";
+                    option.className = "instrument-option";
+
+                    const symbol = document.createElement("strong");
+                    symbol.textContent = instrument.symbol;
+
+                    const details = document.createElement("small");
+
+                    details.textContent =
+                        `${instrument.name} · ${instrument.category}`;
+
+                    option.appendChild(symbol);
+                    option.appendChild(details);
+
+
+                    // Select an instrument.
+                    option.addEventListener("click", function () {
+
+                        pairInput.value = instrument.symbol;
+                        searchInput.value = instrument.symbol;
+
+                        selectedSpec = instrument;
+
+                        priceDecimals = Number(instrument.price_decimals);
+
+                        if (
+                            !Number.isInteger(priceDecimals) ||
+                            priceDecimals < 0 ||
+                            priceDecimals > 10
+                        ) {
+
+                            priceDecimals = null;
+
+                            alert(
+                                "The price precision for this instrument is unavailable."
+                            );
+
+                            clearSelection();
+                            searchInput.value = "";
+
+                            return;
+
+                        }
+
+
+                        contractDisplay.value =
+                            instrument.contract_size.toLocaleString();
+
+                        minimumLotDisplay.value =
+                            instrument.minimum_lot_size;
+
+                        lotInput.min = instrument.minimum_lot_size;
+
+                        selectedInstrument.textContent =
+                            `${instrument.name} selected. Price precision: ${priceDecimals} decimal places. Contract size loaded automatically.`;
+
+
+                        // USD quote currency requires conversion rate 1.
+                        if (instrument.quote_currency === "USD") {
+
+                            conversionInput.value = "1";
+                            conversionInput.readOnly = true;
+
+                        } else {
+
+                            conversionInput.readOnly = false;
+
+                        }
+
+                        suggestions.innerHTML = "";
+
+                    });
+
+
+                    suggestions.appendChild(option);
+
+                });
+
+            } catch (error) {
+
+                suggestions.textContent =
+                    "Unable to search instruments. Please try again.";
+
+                console.error(error);
+
+            }
+
+        }, 250);
+
+    });
+
+
+    // Validate the trade before submission.
+    tradeForm.addEventListener("submit", function (event) {
+
+        if (!pairInput.value || !selectedSpec) {
+
+            event.preventDefault();
+
+            alert(
+                "Please select an available instrument from the suggestions."
+            );
+
+            searchInput.focus();
+            return;
+
+        }
+
+
+        if (priceDecimals === null) {
+
+            event.preventDefault();
+
+            alert("The selected instrument's price precision is unavailable.");
+
+            searchInput.focus();
+            return;
+
+        }
+
+
+        // Validate and format all four price fields.
+        for (const input of priceInputs) {
+
+            const value = Number(input.value);
+
+            if (
+                input.value.trim() === "" ||
+                !Number.isFinite(value) ||
+                value <= 0
+            ) {
+
+                event.preventDefault();
+
+                alert("Please enter a valid positive price in all price fields.");
+
+                input.focus();
+                return;
+
+            }
+
+            formatPrice(input);
+
+        }
+
+
+        if (Number(lotInput.value) < selectedSpec.minimum_lot_size) {
+
+            event.preventDefault();
+
+            alert(
+                `The minimum lot size for ${selectedSpec.symbol} is ${selectedSpec.minimum_lot_size}.`
+            );
+
+            lotInput.focus();
+
+        }
+
+    });
+
+
+    // Close suggestions when clicking outside the instrument search.
+    document.addEventListener("click", function (event) {
+
+        if (!event.target.closest(".instrument-search")) {
+            suggestions.innerHTML = "";
+        }
+
+    });
+
+});
+</script>
+
+{% endblock %}

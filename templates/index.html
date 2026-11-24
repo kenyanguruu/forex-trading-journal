@@ -1,0 +1,193 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+Home | Forex Trading Journal
+{% endblock %}
+
+{% block content %}
+
+<div class="home-page">
+
+    <!-- HERO SECTION -->
+    <section class="home-hero">
+
+        <div class="hero-content">
+
+            <span class="hero-label">
+                YOUR TRADING WORKSPACE
+            </span>
+
+            <h2>
+                Trade with purpose.<br>
+                Track your progress.
+            </h2>
+
+            <p>
+                Keep your trading activity organized, monitor your
+                performance, and use your trading history to make
+                better-informed decisions.
+            </p>
+
+            <div class="hero-actions">
+
+                <a href="{{ url_for('add_trade') }}"
+                   class="primary-button">
+                    + Add New Trade
+                </a>
+
+                <a href="{{ url_for('view_trades') }}"
+                   class="secondary-button">
+                    View My Trades
+                </a>
+
+            </div>
+
+        </div>
+
+        <div class="hero-decoration">
+            <div class="hero-chart-icon">↗</div>
+            <span>PLAN</span>
+            <span>EXECUTE</span>
+            <span>REVIEW</span>
+        </div>
+
+    </section>
+
+
+    <!-- QUICK ACCESS -->
+    <section class="home-section">
+
+        <div class="home-section-heading">
+            <div>
+                <h3>Quick Access</h3>
+                <p>Go directly to the tools you need.</p>
+            </div>
+        </div>
+
+        <div class="home-card-grid">
+
+            <a href="{{ url_for('add_trade') }}"
+               class="home-card">
+
+                <div class="home-card-icon">＋</div>
+
+                <h4>Add a Trade</h4>
+
+                <p>
+                    Record a new trading position and keep
+                    your trading history up to date.
+                </p>
+
+                <span class="home-card-link">
+                    Add trade →
+                </span>
+
+            </a>
+
+
+            <a href="{{ url_for('view_trades') }}"
+               class="home-card">
+
+                <div class="home-card-icon">▤</div>
+
+                <h4>Trade History</h4>
+
+                <p>
+                    Review your previous trades, search
+                    records, and update trade information.
+                </p>
+
+                <span class="home-card-link">
+                    View trades →
+                </span>
+
+            </a>
+
+
+            <a href="{{ url_for('trading_reports') }}"
+               class="home-card">
+
+                <div class="home-card-icon">▥</div>
+
+                <h4>Trading Reports</h4>
+
+                <p>
+                    Analyze weekly, monthly, and yearly
+                    trading performance.
+                </p>
+
+                <span class="home-card-link">
+                    View reports →
+                </span>
+
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <!-- JOURNAL FEATURES -->
+    <section class="home-section">
+
+        <div class="home-section-heading">
+            <div>
+                <h3>Your Trading Toolkit</h3>
+                <p>Tools designed to help you understand your trading.</p>
+            </div>
+        </div>
+
+        <div class="home-feature-grid">
+
+            <div class="home-feature">
+                <span>01</span>
+                <div>
+                    <h4>Performance Tracking</h4>
+                    <p>
+                        Monitor wins, losses, profitability,
+                        and risk-to-reward performance.
+                    </p>
+                </div>
+            </div>
+
+            <div class="home-feature">
+                <span>02</span>
+                <div>
+                    <h4>Performance Charts</h4>
+                    <p>
+                        Visualize your trading results and
+                        identify patterns in your performance.
+                    </p>
+                </div>
+            </div>
+
+            <div class="home-feature">
+                <span>03</span>
+                <div>
+                    <h4>Broker Specifications</h4>
+                    <p>
+                        Use supported broker and account
+                        specifications when recording trades.
+                    </p>
+                </div>
+            </div>
+
+            <div class="home-feature">
+                <span>04</span>
+                <div>
+                    <h4>PDF Reports</h4>
+                    <p>
+                        Generate downloadable reports of
+                        your trading activity.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+    </section>
+
+</div>
+
+{% endblock %}

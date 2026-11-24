@@ -1,0 +1,14 @@
+
+.env
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Private trading data
+/data/*
+!/data/.gitkeep
+/backups/
+trades.csv
+trades.txt
+trades_backup.csv
