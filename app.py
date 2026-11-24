@@ -1,7 +1,30 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    jsonify,
+    session,
+)
+from flask_wtf.csrf import CSRFProtect
+from authlib.integrations.flask_client import OAuth
+import secrets
+from authlib.integrations.base_client.errors import OAuthError
 from instruments import search_instruments
 from flask import Response
 import csv
+from flask_login import (
+    LoginManager,
+    login_user,
+    logout_user,
+    login_required,
+    current_user,
+)
+from urllib.parse import urlsplit
+from models import db, User, Trade
+from otp_service import create_and_send_otp, verify_otp
 from ecb_rates import get_historical_conversion_rate
 import io
 from reports import (
@@ -50,10 +73,90 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+
+app.config["WTF_CSRF_TIME_LIMIT"] = 3600
+
+csrf = CSRFProtect(app)
+
+# --------------------------------------------------
+# SESSION SECURITY
+# --------------------------------------------------
+
+from datetime import timedelta
+
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=30)
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+# Enable secure cookies when deployed over HTTPS.
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.getenv("SESSION_COOKIE_SECURE", "False").lower() == "true"
+)
 
 if not app.config["SECRET_KEY"]:
     raise RuntimeError("SECRET_KEY is missing. Check your .env file.")
+
+
+# --------------------------------------------------
+# DATABASE CONFIGURATION
+# --------------------------------------------------
+
+database_url = os.getenv("DATABASE_URL")
+
+if database_url:
+    # Use PostgreSQL when DATABASE_URL is configured.
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
+
+else:
+    # Keep using the existing local SQLite database.
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///trading_journal.db"
+
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+
+db.init_app(app)
+
+
+# LOGIN CONFIGURATION
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+login_manager.login_view = "login"
+login_manager.login_message = "Please log in to access this page."
+login_manager.login_message_category = "info"
+login_manager.session_protection = "strong"
+
+oauth = OAuth(app)
+
+google = oauth.register(
+    name="google",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url=(
+        "https://accounts.google.com/.well-known/openid-configuration"
+    ),
+    client_kwargs={"scope": "openid email profile"},
+)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+
+# CREATE DATABASE TABLES
+with app.app_context():
+    db.create_all()
 
 
 def get_verified_price_decimals(spec, pair):
@@ -105,6 +208,477 @@ def get_verified_price_decimals(spec, pair):
 def home():
 
     return render_template("index.html")
+
+
+# --------------------------------------------------
+# USER REGISTRATION
+# --------------------------------------------------
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+
+    if request.method == "POST":
+
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not name or not email or not password or not confirm_password:
+            flash("Please complete all fields.", "error")
+            return redirect(url_for("register"))
+
+        if len(password) < 8:
+            flash("Password must contain at least 8 characters.", "error")
+            return redirect(url_for("register"))
+
+        if password != confirm_password:
+            flash("Passwords do not match.", "error")
+            return redirect(url_for("register"))
+
+        existing_user = db.session.execute(
+            db.select(User).filter_by(email=email)
+        ).scalar_one_or_none()
+
+        if existing_user:
+
+            if existing_user.is_verified:
+                flash("An account with this email already exists.", "error")
+                return redirect(url_for("register"))
+
+            # Existing unverified account: resend verification OTP.
+            session["pending_verification_email"] = email
+
+        else:
+
+            new_user = User(name=name, email=email)
+            new_user.set_password(password)
+
+            try:
+                db.session.add(new_user)
+                db.session.commit()
+
+            except Exception:
+                db.session.rollback()
+                flash("Unable to create your account. Please try again.", "error")
+                return redirect(url_for("register"))
+
+            session["pending_verification_email"] = email
+
+        try:
+            create_and_send_otp(email, "verification")
+            flash("A verification code has been sent to your email.", "success")
+
+        except ValueError as error:
+            flash(str(error), "error")
+
+        except Exception:
+            flash(
+                "Your account is saved, but the verification email could not be sent. Please try again.",
+                "error",
+            )
+
+        return redirect(url_for("verify_email"))
+
+    return render_template("register.html")
+
+
+# --------------------------------------------------
+# EMAIL VERIFICATION
+# --------------------------------------------------
+
+
+@app.route("/verify-email", methods=["GET", "POST"])
+def verify_email():
+
+    email = session.get("pending_verification_email")
+
+    if not email:
+        flash("Please register or request email verification first.", "error")
+        return redirect(url_for("register"))
+
+    user = db.session.execute(
+        db.select(User).filter_by(email=email)
+    ).scalar_one_or_none()
+
+    if user is None:
+        session.pop("pending_verification_email", None)
+        flash("Account not found. Please register again.", "error")
+        return redirect(url_for("register"))
+
+    if user.is_verified:
+        session.pop("pending_verification_email", None)
+        flash("Your email is already verified. Please log in.", "success")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+
+        otp = request.form.get("otp", "").strip()
+
+        if not otp:
+            flash("Please enter your verification code.", "error")
+            return redirect(url_for("verify_email"))
+
+        if verify_otp(email, otp, "verification"):
+
+            user.is_verified = True
+
+            try:
+                db.session.commit()
+
+            except Exception:
+                db.session.rollback()
+                flash("Verification could not be completed. Please try again.", "error")
+                return redirect(url_for("verify_email"))
+
+            session.pop("pending_verification_email", None)
+
+            flash("Your email has been verified. You can now log in.", "success")
+            return redirect(url_for("login"))
+
+        flash("Invalid or expired verification code.", "error")
+        return redirect(url_for("verify_email"))
+
+    return render_template("verify_email.html", email=email)
+
+
+# --------------------------------------------------
+# RESEND VERIFICATION OTP
+# --------------------------------------------------
+
+
+@app.route("/resend-otp", methods=["POST"])
+def resend_otp():
+
+    email = session.get("pending_verification_email")
+
+    if not email:
+        flash("Please register or request verification first.", "error")
+        return redirect(url_for("register"))
+
+    user = db.session.execute(
+        db.select(User).filter_by(email=email)
+    ).scalar_one_or_none()
+
+    if user is None or user.is_verified:
+        session.pop("pending_verification_email", None)
+        flash("No pending email verification was found.", "error")
+        return redirect(url_for("login"))
+
+    try:
+        create_and_send_otp(email, "verification")
+        flash("A new verification code has been sent.", "success")
+
+    except ValueError as error:
+        flash(str(error), "error")
+
+    except Exception:
+        flash("Unable to send a new verification code. Please try again.", "error")
+
+    return redirect(url_for("verify_email"))
+
+
+# --------------------------------------------------
+# USER LOGIN
+# --------------------------------------------------
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+
+    if request.method == "POST":
+
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        if not email or not password:
+            flash("Please enter your email and password.", "error")
+            return redirect(url_for("login"))
+
+        user = db.session.execute(
+            db.select(User).filter_by(email=email)
+        ).scalar_one_or_none()
+
+        if user is None or not user.check_password(password):
+            flash("Invalid email or password.", "error")
+            return redirect(url_for("login"))
+
+        if not user.is_verified:
+            session["pending_verification_email"] = email
+            flash("Please verify your email before logging in.", "error")
+            return redirect(url_for("verify_email"))
+
+        try:
+            create_and_send_otp(email, "login")
+        except (ValueError, RuntimeError):
+            flash(
+                "Unable to send your login verification code. Please try again.",
+                "error",
+            )
+            return redirect(url_for("login"))
+
+        session["pending_login_email"] = email
+        session["login_next_page"] = request.args.get("next", "")
+
+        flash("A login verification code has been sent to your email.", "success")
+
+        return redirect(url_for("verify_login"))
+
+    return render_template("login.html")
+
+
+# --------------------------------------------------
+# LOGIN OTP VERIFICATION
+# --------------------------------------------------
+
+
+@app.route("/verify-login", methods=["GET", "POST"])
+def verify_login():
+
+    email = session.get("pending_login_email")
+
+    if not email:
+        flash("Please log in first.", "error")
+        return redirect(url_for("login"))
+
+    user = db.session.execute(
+        db.select(User).filter_by(email=email)
+    ).scalar_one_or_none()
+
+    if user is None or not user.is_verified:
+        session.pop("pending_login_email", None)
+        session.pop("login_next_page", None)
+
+        flash("Account not found or not verified. Please log in again.", "error")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+
+        otp = request.form.get("otp", "").strip()
+
+        if not otp:
+            flash("Please enter your login verification code.", "error")
+            return redirect(url_for("verify_login"))
+
+        if verify_otp(email, otp, "login"):
+
+            login_user(user)
+            session.permanent = True
+
+            next_page = session.pop("login_next_page", "")
+            session.pop("pending_login_email", None)
+
+            flash("You have logged in successfully.", "success")
+
+            if next_page:
+                parsed_url = urlsplit(next_page)
+
+                if (
+                    not parsed_url.scheme
+                    and not parsed_url.netloc
+                    and next_page.startswith("/")
+                    and not next_page.startswith("//")
+                ):
+                    return redirect(next_page)
+
+            return redirect(url_for("home"))
+
+        flash("Invalid or expired login verification code.", "error")
+        return redirect(url_for("verify_login"))
+
+    return render_template("verify_login.html", email=email)
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+
+    if request.method == "POST":
+
+        email = request.form.get("email", "").strip().lower()
+
+        user = User.query.filter_by(email=email).first()
+
+        # Send a reset code only to an existing verified account.
+        if user and user.is_verified:
+
+            try:
+                create_and_send_otp(email, "password_reset")
+
+                session["pending_password_reset_email"] = email
+
+            except ValueError:
+                flash("Please wait before requesting another code.", "warning")
+
+            except RuntimeError:
+                flash(
+                    "We could not send the recovery code. Please try again.", "danger"
+                )
+
+        # Keep the response generic to avoid revealing registered emails.
+        flash(
+            "If an eligible account exists for that email, "
+            "a password recovery code will be sent.",
+            "info",
+        )
+
+        return redirect(url_for("reset_password"))
+
+    return render_template("forgot_password.html")
+
+
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+
+    email = session.get("pending_password_reset_email")
+
+    if not email:
+        if request.method == "POST":
+            flash("The recovery session is unavailable. Please try again.", "warning")
+            return redirect(url_for("forgot_password"))
+
+        return render_template("reset_password.html")
+
+    if request.method == "POST":
+
+        otp = request.form.get("otp", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not otp:
+            flash("Please enter your recovery code.", "danger")
+            return redirect(url_for("reset_password"))
+
+        if len(password) < 8:
+            flash("Your new password must contain at least 8 characters.", "danger")
+            return redirect(url_for("reset_password"))
+
+        if password != confirm_password:
+            flash("Your passwords do not match.", "danger")
+            return redirect(url_for("reset_password"))
+
+        user = User.query.filter_by(email=email).first()
+
+        if not user or not user.is_verified:
+            flash("Invalid recovery request.", "danger")
+            session.pop("pending_password_reset_email", None)
+            return redirect(url_for("forgot_password"))
+
+        if not verify_otp(email, otp, "password_reset"):
+            flash("The recovery code is invalid, expired, or has been used.", "danger")
+            return redirect(url_for("reset_password"))
+
+        user.set_password(password)
+        db.session.commit()
+
+        session.pop("pending_password_reset_email", None)
+
+        flash("Your password has been reset successfully. Please log in.", "success")
+
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html")
+
+
+# USER LOGOUT
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+
+    logout_user()
+
+    flash("You have logged out successfully.", "success")
+
+    return redirect(url_for("home"))
+
+
+@app.route("/login/google")
+def google_login():
+    redirect_uri = url_for("google_callback", _external=True)
+
+    return google.authorize_redirect(redirect_uri, prompt="select_account")
+
+
+@app.route("/google/callback")
+def google_callback():
+
+    try:
+        token = google.authorize_access_token()
+
+        user_info = token.get("userinfo")
+
+        if not user_info:
+            flash("Google could not verify your account.", "danger")
+            return redirect(url_for("login"))
+
+        google_id = user_info.get("sub")
+        email = user_info.get("email", "").strip().lower()
+        email_verified = user_info.get("email_verified", False)
+        name = user_info.get("name") or email
+
+        if not google_id or not email or email_verified is not True:
+            flash("Your Google account could not be verified.", "danger")
+            return redirect(url_for("login"))
+
+        # First, check whether this Google account is already linked.
+        user = User.query.filter_by(google_id=google_id).first()
+
+        if user:
+            if user.email != email:
+                flash(
+                    "Your Google account details have changed. Please contact support.",
+                    "danger",
+                )
+                return redirect(url_for("login"))
+
+        else:
+            # Check whether this email already belongs to an account.
+            user = User.query.filter_by(email=email).first()
+
+            if user:
+                # Only link an existing verified account.
+                if not user.is_verified:
+                    flash(
+                        "Please verify your existing account's email before continuing with Google.",
+                        "warning",
+                    )
+                    return redirect(url_for("login"))
+
+                user.google_id = google_id
+
+            else:
+                # Create a new verified Google account.
+                user = User(
+                    name=name,
+                    email=email,
+                    is_verified=True,
+                )
+
+                # Generate an unknown random password.
+                user.set_password(secrets.token_urlsafe(32))
+
+                user.google_id = google_id
+
+                db.session.add(user)
+
+        db.session.commit()
+
+        login_user(user)
+        session.permanent = True
+
+        flash("You have logged in successfully with Google.", "success")
+        return redirect(url_for("home"))
+
+    except OAuthError:
+        db.session.rollback()
+        flash("Google authentication failed. Please try again.", "danger")
+        return redirect(url_for("login"))
+
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Google login failed")
+        flash("An unexpected error occurred during Google login.", "danger")
+        return redirect(url_for("login"))
 
 
 # --------------------------------------------------
@@ -176,7 +750,7 @@ def instrument_search():
                     "minimum_lot_size": spec["minimum_lot_size"],
                     "maximum_lot_size_day": spec.get("maximum_lot_size_day"),
                     "maximum_lot_size_night": spec.get("maximum_lot_size_night"),
-                    "price_decimals": get_verified_price_decimals(spec, symbol),
+                    "price_decimals": get_verified_price_decimals(spec, cent_symbol),
                     "calculation_type": spec["calculation_type"],
                 }
             )
@@ -251,6 +825,7 @@ def api_broker_entities(broker_id):
 
 
 @app.route("/add-trade", methods=["GET", "POST"])
+@login_required
 def add_trade():
 
     if request.method == "POST":
@@ -337,8 +912,15 @@ def add_trade():
             if not trade_date or not trade_time:
                 raise ValueError("Please provide the trade date and time.")
 
-            datetime.strptime(trade_date, "%Y-%m-%d")
+            # Validate the date and time formats.
+            parsed_trade_date = datetime.strptime(trade_date, "%Y-%m-%d").date()
             datetime.strptime(trade_time, "%H:%M")
+
+            # Prevent future trade dates using Nairobi local time.
+            today = datetime.now(ZoneInfo("Africa/Nairobi")).date()
+
+            if parsed_trade_date > today:
+                raise ValueError("Future trade dates are not allowed.")
             conversion_rate = get_historical_conversion_rate(
                 spec["quote_currency"],
                 trade_date,
@@ -389,7 +971,7 @@ def add_trade():
                 "Trade Time": trade_time,
             }
 
-            save_trade(trade)
+            save_trade(trade, current_user.id)
 
             flash("Trade saved successfully!", "success")
             return redirect(url_for("add_trade"))
@@ -418,18 +1000,22 @@ def add_trade():
     accounts = get_account_types(selected_broker)
     entities = get_broker_entities(selected_broker)
 
+    today = datetime.now(ZoneInfo("Africa/Nairobi")).date().isoformat()
+
     return render_template(
         "add_trade.html",
         accounts=accounts,
         brokers=supported_brokers,
         selected_broker=selected_broker,
         entities=entities,
+        today=today,
     )
 
 
 @app.route("/trades")
+@login_required
 def view_trades():
-    all_trades = load_trades()
+    all_trades = load_trades(current_user.id)
 
     # Read filter values
     start_date = request.args.get("start_date", "").strip()
@@ -521,6 +1107,7 @@ def view_trades():
 
 
 @app.route("/reports")
+@login_required
 def trading_reports():
     today = date.today()
     current_iso = today.isocalendar()
@@ -554,7 +1141,7 @@ def trading_reports():
         flash("Invalid report period selected.", "error")
         return redirect(url_for("trading_reports"))
 
-    all_trades = load_trades()
+    all_trades = load_trades(current_user.id)
 
     # Build a list of years from existing trades, plus recent years.
     available_years = {today.year, current_iso.year}
@@ -685,6 +1272,7 @@ def trading_reports():
 
 
 @app.route("/reports/download-pdf")
+@login_required
 def download_report_pdf():
     period = request.args.get("period", "weekly").lower()
 
@@ -717,7 +1305,7 @@ def download_report_pdf():
         flash("Invalid report period selected.", "error")
         return redirect(url_for("trading_reports"))
 
-    all_trades = load_trades()
+    all_trades = load_trades(current_user.id)
 
     report_trades = filter_trades_by_period(
         all_trades,
@@ -880,8 +1468,9 @@ def download_report_pdf():
 
 
 @app.route("/export-trades")
+@login_required
 def export_trades():
-    trades = load_trades()
+    trades = load_trades(current_user.id)
 
     output = io.StringIO()
 
@@ -908,8 +1497,9 @@ def export_trades():
 
 
 @app.route("/trade-details/<trade_id>")
+@login_required
 def trade_details(trade_id):
-    trade = get_trade_by_id(trade_id)
+    trade = get_trade_by_id(trade_id, current_user.id)
 
     if trade is None:
         flash("Trade not found.", "error")
@@ -919,9 +1509,9 @@ def trade_details(trade_id):
 
 
 @app.route("/edit-trade/<trade_id>", methods=["GET", "POST"])
+@login_required
 def edit_trade(trade_id):
-
-    trade = get_trade_by_id(trade_id)
+    trade = get_trade_by_id(trade_id, current_user.id)
 
     if trade is None:
         flash("Trade not found.", "error")
@@ -1039,11 +1629,18 @@ def edit_trade(trade_id):
             # --------------------------------------------------
 
             if not trade_date or not trade_time:
-
                 raise ValueError("Please provide the trade date and time.")
 
-            datetime.strptime(trade_date, "%Y-%m-%d")
+            # Validate the date and time formats.
+            parsed_trade_date = datetime.strptime(trade_date, "%Y-%m-%d").date()
             datetime.strptime(trade_time, "%H:%M")
+
+            # Prevent future trade dates using Nairobi local time.
+            today = datetime.now(ZoneInfo("Africa/Nairobi")).date()
+
+            if parsed_trade_date > today:
+                raise ValueError("Future trade dates are not allowed.")
+
             conversion_rate = get_historical_conversion_rate(
                 spec["quote_currency"],
                 trade_date,
@@ -1121,7 +1718,7 @@ def edit_trade(trade_id):
             # SAVE UPDATED TRADE
             # --------------------------------------------------
 
-            if update_trade(trade_id, updated_data):
+            if update_trade(trade_id, updated_data, current_user.id):
 
                 flash("Trade updated successfully!", "success")
 
@@ -1155,6 +1752,8 @@ def edit_trade(trade_id):
 
     entities = get_broker_entities(selected_broker)
 
+    today = datetime.now(ZoneInfo("Africa/Nairobi")).date().isoformat()
+
     return render_template(
         "edit_trade.html",
         trade=trade,
@@ -1162,12 +1761,14 @@ def edit_trade(trade_id):
         accounts=accounts,
         entities=entities,
         selected_broker=selected_broker,
+        today=today,
     )
 
 
 @app.route("/delete-trade/<trade_id>", methods=["POST"])
+@login_required
 def delete_trade_route(trade_id):
-    if remove_trade(trade_id):
+    if remove_trade(trade_id, current_user.id):
         flash("Trade deleted successfully.", "success")
     else:
         flash("Trade not found.", "error")
@@ -1176,8 +1777,9 @@ def delete_trade_route(trade_id):
 
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
-    trades = load_trades()
+    trades = load_trades(current_user.id)
 
     def get_number(value):
         try:
@@ -1292,6 +1894,7 @@ def dashboard():
                 "total": 0,
                 "wins": 0,
                 "losses": 0,
+                "breakeven": 0,
                 "net_profit": 0,
             }
 
@@ -1305,6 +1908,8 @@ def dashboard():
             stats["wins"] += 1
         elif result == "LOSS":
             stats["losses"] += 1
+        elif result == "BREAKEVEN":
+            stats["breakeven"] += 1
 
     monthly_stats = [monthly_data[key] for key in sorted(monthly_data)]
 
@@ -1395,4 +2000,4 @@ def dashboard():
 
 if __name__ == "__main__":
 
-    app.run(debug=True)
+    app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() == "true")
