@@ -1,4 +1,4 @@
-
+```html
 {% extends "base.html" %}
 
 {% block title %}
@@ -9,10 +9,11 @@ Dashboard | Forex Trading Journal
 
 <section class="dashboard-section">
 
+    <!-- PAGE HEADER -->
     <div class="page-heading">
         <div>
-            <h2>Trading Dashboard</h2>
-            <p>Analyze your trading performance and progress.</p>
+            <h2>📊 Trading Dashboard</h2>
+            <p>Analyze your trading performance and monitor your progress.</p>
         </div>
 
         <a href="{{ url_for('add_trade') }}" class="primary-button">
@@ -20,283 +21,292 @@ Dashboard | Forex Trading Journal
         </a>
     </div>
 
-    <h3 class="dashboard-heading">Trading Overview</h3>
+    <!-- TRADING OVERVIEW -->
+    <h3 class="dashboard-heading">📈 Trading Overview</h3>
 
     <div class="dashboard-grid">
 
         <div class="dashboard-card">
-            <span>Total Trades</span>
+            <span>📋 Total Trades</span>
             <strong>{{ total_trades }}</strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Win Rate</span>
+            <span>🎯 Win Rate</span>
             <strong>{{ "%.2f"|format(win_rate) }}%</strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Winning Trades</span>
+            <span>🏆 Winning Trades</span>
             <strong class="positive">{{ wins }}</strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Losing Trades</span>
+            <span>📉 Losing Trades</span>
             <strong class="negative">{{ losses }}</strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Breakeven Trades</span>
+            <span>⚖️ Breakeven Trades</span>
             <strong>{{ breakeven }}</strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Average R:R</span>
+            <span>🎯 Average R:R</span>
             <strong>{{ "%.2f"|format(average_rrr) }}</strong>
         </div>
 
     </div>
 
-    <h3 class="dashboard-heading">Financial Performance</h3>
+    <!-- FINANCIAL PERFORMANCE -->
+    <h3 class="dashboard-heading">💰 Financial Performance</h3>
 
     <div class="dashboard-grid financial-grid">
 
         <div class="dashboard-card">
-            <span>Gross Profit</span>
+            <span>💵 Gross Profit</span>
             <strong class="positive">
-                ${{ "%.2f"|format(gross_profit) }}
+                ${{ "{:,.2f}".format(gross_profit) }}
             </strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Gross Loss</span>
+            <span>📉 Gross Loss</span>
             <strong class="negative">
-                ${{ "%.2f"|format(gross_loss) }}
+                ${{ "{:,.2f}".format(gross_loss) }}
             </strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Net Profit / Loss</span>
+            <span>💹 Net Profit / Loss</span>
             <strong class="{{ 'positive' if net_profit >= 0 else 'negative' }}">
-                ${{ "%.2f"|format(net_profit) }}
+                ${{ "{:,.2f}".format(net_profit) }}
             </strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Average P/L per Trade</span>
+            <span>📊 Average P/L per Trade</span>
             <strong class="{{ 'positive' if average_profit >= 0 else 'negative' }}">
-                ${{ "%.2f"|format(average_profit) }}
+                ${{ "{:,.2f}".format(average_profit) }}
             </strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Best Trade</span>
+            <span>🚀 Best Trade</span>
             <strong class="positive">
-                ${{ "%.2f"|format(best_trade) }}
+                ${{ "{:,.2f}".format(best_trade) }}
             </strong>
         </div>
 
         <div class="dashboard-card">
-            <span>Worst Trade</span>
+            <span>🔻 Worst Trade</span>
             <strong class="{{ 'negative' if worst_trade < 0 else '' }}">
-                ${{ "%.2f"|format(worst_trade) }}
+                ${{ "{:,.2f}".format(worst_trade) }}
             </strong>
         </div>
 
     </div>
 
-    <h3 class="dashboard-heading">Trade Direction</h3>
+    <!-- TRADE DIRECTION -->
+    <h3 class="dashboard-heading">↕️ Trade Direction</h3>
 
     <div class="direction-overview">
 
         <div class="direction-card">
-            <span>BUY Trades</span>
+            <span>🟢 BUY Trades</span>
             <strong>{{ buy_trades }}</strong>
         </div>
 
         <div class="direction-card">
-            <span>SELL Trades</span>
+            <span>🔴 SELL Trades</span>
             <strong>{{ sell_trades }}</strong>
         </div>
 
     </div>
 
+    <!-- INSTRUMENT PERFORMANCE -->
+    <h3 class="dashboard-heading">🌍 Instrument Performance</h3>
 
-<h3 class="dashboard-heading">Currency Pair Performance</h3>
+    {% if pair_stats %}
 
-{% if pair_stats %}
+    <div class="pair-performance">
 
-<div class="pair-performance">
+        <div class="table-container">
+            <table class="trades-table">
+                <thead>
+                    <tr>
+                        <th>Instrument</th>
+                        <th>Trades</th>
+                        <th>Wins</th>
+                        <th>Losses</th>
+                        <th>Win Rate</th>
+                        <th>Net P/L</th>
+                    </tr>
+                </thead>
 
-    <div class="table-container">
-        <table class="trades-table">
-            <thead>
-                <tr>
-                    <th>Pair</th>
-                    <th>Trades</th>
-                    <th>Wins</th>
-                    <th>Losses</th>
-                    <th>Win Rate</th>
-                    <th>Net P/L</th>
-                </tr>
-            </thead>
+                <tbody>
+                    {% for pair in pair_stats %}
+                    <tr>
+                        <td><strong>{{ pair.pair }}</strong></td>
+                        <td>{{ pair.total }}</td>
+                        <td class="positive">{{ pair.wins }}</td>
+                        <td class="negative">{{ pair.losses }}</td>
+                        <td>{{ "%.2f"|format(pair.win_rate) }}%</td>
+                        <td class="{{ 'positive' if pair.net_profit >= 0 else 'negative' }}">
+                            ${{ "%.2f"|format(pair.net_profit) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-            <tbody>
-                {% for pair in pair_stats %}
-                <tr>
-                    <td><strong>{{ pair.pair }}</strong></td>
-                    <td>{{ pair.total }}</td>
-                    <td class="positive">{{ pair.wins }}</td>
-                    <td class="negative">{{ pair.losses }}</td>
-                    <td>{{ "%.2f"|format(pair.win_rate) }}%</td>
-                    <td class="{{ 'positive' if pair.net_profit >= 0 else 'negative' }}">
+        <h3 class="dashboard-heading">📊 Instrument Net P/L Comparison</h3>
+
+        <div class="pair-chart">
+
+            {% for pair in pair_stats %}
+            <div class="pair-chart-row">
+
+                <div class="pair-chart-label">
+                    <strong>{{ pair.pair }}</strong>
+
+                    <span class="{{ 'positive' if pair.net_profit >= 0 else 'negative' }}">
                         ${{ "%.2f"|format(pair.net_profit) }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <h3 class="dashboard-heading">Net P/L Comparison</h3>
-
-    <div class="pair-chart">
-
-        {% for pair in pair_stats %}
-        <div class="pair-chart-row">
-
-            <div class="pair-chart-label">
-                <strong>{{ pair.pair }}</strong>
-                <span class="{{ 'positive' if pair.net_profit >= 0 else 'negative' }}">
-                    ${{ "%.2f"|format(pair.net_profit) }}
-                </span>
-            </div>
-
-            <div class="pair-chart-track">
-                <div
-                    class="pair-chart-bar {{ 'profit-bar' if pair.net_profit >= 0 else 'loss-bar' }}"
-                    style="width: {{ pair.bar_width }}%;">
+                    </span>
                 </div>
+
+                <div class="pair-chart-track">
+                    <div
+                        class="pair-chart-bar {{ 'profit-bar' if pair.net_profit >= 0 else 'loss-bar' }}"
+                        style="width: {{ pair.bar_width }}%;">
+                    </div>
+                </div>
+
             </div>
+            {% endfor %}
 
         </div>
-        {% endfor %}
 
     </div>
 
-</div>
+    {% else %}
 
-{% else %}
+    <div class="empty-trades">
+        <p>No instrument performance data is available yet.</p>
+    </div>
 
-<div class="empty-trades">
-    <p>No pair performance data is available yet.</p>
-</div>
+    {% endif %}
 
-{% endif %}
-    
-<h3 class="dashboard-heading">Monthly Performance</h3>
+    <!-- MONTHLY PERFORMANCE -->
+    <h3 class="dashboard-heading">📅 Monthly Performance</h3>
 
-{% if monthly_stats %}
+    {% if monthly_stats %}
 
-<div class="pair-performance">
+    <div class="pair-performance">
 
-    <div class="table-container">
-        <table class="trades-table">
-            <thead>
-                <tr>
-                    <th>Month</th>
-                    <th>Trades</th>
-                    <th>Wins</th>
-                    <th>Losses</th>
-                    <th>Win Rate</th>
-                    <th>Net P/L</th>
-                </tr>
-            </thead>
+        <div class="table-container">
+            <table class="trades-table">
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Trades</th>
+                        <th>Wins</th>
+                        <th>Losses</th>
+                        <th>Breakeven</th>
+                        <th>Win Rate</th>
+                        <th>Net P/L</th>
+                    </tr>
+                </thead>
 
-            <tbody>
-                {% for month in monthly_stats %}
-                <tr>
-                    <td><strong>{{ month.month }}</strong></td>
-                    <td>{{ month.total }}</td>
-                    <td class="positive">{{ month.wins }}</td>
-                    <td class="negative">{{ month.losses }}</td>
-                    <td>{{ "%.2f"|format(month.win_rate) }}%</td>
-                    <td class="{{ 'positive' if month.net_profit >= 0 else 'negative' }}">
+                <tbody>
+                    {% for month in monthly_stats %}
+                    <tr>
+                        <td><strong>{{ month.month }}</strong></td>
+                        <td>{{ month.total }}</td>
+                        <td class="positive">{{ month.wins }}</td>
+                        <td class="negative">{{ month.losses }}</td>
+                        <td>{{ month.breakeven }}</td>
+                        <td>{{ "%.2f"|format(month.win_rate) }}%</td>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h3 class="dashboard-heading">📈 Monthly Net P/L Comparison</h3>
+
+        <div class="pair-chart">
+
+            {% for month in monthly_stats %}
+            <div class="pair-chart-row">
+
+                <div class="pair-chart-label">
+                    <strong>{{ month.month }}</strong>
+
+                    <span class="{{ 'positive' if month.net_profit >= 0 else 'negative' }}">
                         ${{ "%.2f"|format(month.net_profit) }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <h3 class="dashboard-heading">Monthly Net P/L Comparison</h3>
-
-    <div class="pair-chart">
-
-        {% for month in monthly_stats %}
-        <div class="pair-chart-row">
-
-            <div class="pair-chart-label">
-                <strong>{{ month.month }}</strong>
-                <span class="{{ 'positive' if month.net_profit >= 0 else 'negative' }}">
-                    ${{ "%.2f"|format(month.net_profit) }}
-                </span>
-            </div>
-
-            <div class="pair-chart-track">
-                <div
-                    class="pair-chart-bar {{ 'profit-bar' if month.net_profit >= 0 else 'loss-bar' }}"
-                    style="width: {{ month.bar_width }}%;">
+                    </span>
                 </div>
+
+                <div class="pair-chart-track">
+                    <div
+                        class="pair-chart-bar {{ 'profit-bar' if month.net_profit >= 0 else 'loss-bar' }}"
+                        style="width: {{ month.bar_width }}%;">
+                    </div>
+                </div>
+
             </div>
+            {% endfor %}
 
         </div>
-        {% endfor %}
 
     </div>
 
-</div>
+    {% else %}
 
-{% else %}
-
-<div class="empty-trades">
-    <p>No monthly performance data is available yet.</p>
-</div>
-
-{% endif %}
-
-
-<h3 class="dashboard-heading">Visual Performance Analysis</h3>
-
-<div class="charts-grid">
-
-    <div class="chart-card equity-chart-card">
-        <h3>Equity Curve</h3>
-        <p>Cumulative profit and loss over time</p>
-        <div class="chart-wrapper">
-            <canvas id="equityChart"></canvas>
-        </div>
+    <div class="empty-trades">
+        <p>No monthly performance data is available yet.</p>
     </div>
 
-    <div class="chart-card">
-        <h3>Trade Distribution</h3>
-        <p>Winning, losing and breakeven trades</p>
-        <div class="chart-wrapper distribution-wrapper">
-            <canvas id="resultChart"></canvas>
+    {% endif %}
+
+    <!-- VISUAL PERFORMANCE ANALYSIS -->
+    <h3 class="dashboard-heading">📊 Visual Performance Analysis</h3>
+
+    <div class="charts-grid">
+
+        <div class="chart-card equity-chart-card">
+            <h3>📈 Equity Curve</h3>
+            <p>Cumulative profit and loss over time</p>
+
+            <div class="chart-wrapper">
+                <canvas id="equityChart"></canvas>
+            </div>
         </div>
+
+        <div class="chart-card">
+            <h3>🍩 Trade Distribution</h3>
+            <p>Winning, losing and breakeven trades</p>
+
+            <div class="chart-wrapper distribution-wrapper">
+                <canvas id="resultChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card monthly-chart-card">
+            <h3>📅 Monthly Profit / Loss</h3>
+            <p>Net trading performance by month</p>
+
+            <div class="chart-wrapper">
+                <canvas id="monthlyChart"></canvas>
+            </div>
+        </div>
+
     </div>
 
-    <div class="chart-card monthly-chart-card">
-        <h3>Monthly Profit / Loss</h3>
-        <p>Net trading performance by month</p>
-        <div class="chart-wrapper">
-            <canvas id="monthlyChart"></canvas>
-        </div>
-    </div>
-
-</div>
-
-
+    <!-- DASHBOARD FOOTER -->
     <div class="dashboard-footer">
         <a href="{{ url_for('view_trades') }}">
             View All Trades →
@@ -305,6 +315,7 @@ Dashboard | Forex Trading Journal
 
 </section>
 
+<!-- CHART.JS -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
@@ -322,9 +333,14 @@ Dashboard | Forex Trading Journal
 
     const styles = getComputedStyle(document.documentElement);
 
-    const textColor = styles.getPropertyValue("--text-primary").trim() || "#f5f5f7";
-    const mutedColor = styles.getPropertyValue("--text-muted").trim() || "#999999";
-    const borderColor = styles.getPropertyValue("--border-color").trim() || "#333333";
+    const textColor =
+        styles.getPropertyValue("--text-primary").trim() || "#f5f5f7";
+
+    const mutedColor =
+        styles.getPropertyValue("--text-muted").trim() || "#999999";
+
+    const borderColor =
+        styles.getPropertyValue("--border-color").trim() || "#333333";
 
     Chart.defaults.color = mutedColor;
     Chart.defaults.font.family = "Arial, sans-serif";
@@ -332,6 +348,7 @@ Dashboard | Forex Trading Journal
     const commonOptions = {
         responsive: true,
         maintainAspectRatio: false,
+
         plugins: {
             legend: {
                 labels: {
@@ -344,36 +361,46 @@ Dashboard | Forex Trading Journal
     // EQUITY CURVE
     new Chart(document.getElementById("equityChart"), {
         type: "line",
+
         data: {
             labels: equityLabels,
+
             datasets: [{
                 label: "Cumulative P/L ($)",
                 data: equityValues,
+
                 borderColor: "#4f8cff",
                 backgroundColor: "rgba(79, 140, 255, 0.15)",
+
                 fill: true,
                 tension: 0.3,
+
                 pointRadius: 4,
                 pointHoverRadius: 6
             }]
         },
+
         options: {
             ...commonOptions,
+
             scales: {
                 x: {
                     ticks: {
                         color: mutedColor,
                         maxTicksLimit: 7
                     },
+
                     grid: {
                         color: borderColor
                     }
                 },
+
                 y: {
                     ticks: {
                         color: mutedColor,
                         callback: value => "$" + value
                     },
+
                     grid: {
                         color: borderColor
                     }
@@ -385,25 +412,33 @@ Dashboard | Forex Trading Journal
     // WIN / LOSS DISTRIBUTION
     new Chart(document.getElementById("resultChart"), {
         type: "doughnut",
+
         data: {
             labels: resultLabels,
+
             datasets: [{
                 data: resultValues,
+
                 backgroundColor: [
                     "#16a34a",
                     "#dc2626",
                     "#d97706"
                 ],
+
                 borderWidth: 0,
                 hoverOffset: 8
             }]
         },
+
         options: {
             ...commonOptions,
+
             cutout: "65%",
+
             plugins: {
                 legend: {
                     position: "bottom",
+
                     labels: {
                         color: textColor,
                         padding: 18
@@ -416,33 +451,42 @@ Dashboard | Forex Trading Journal
     // MONTHLY PROFIT / LOSS
     new Chart(document.getElementById("monthlyChart"), {
         type: "bar",
+
         data: {
             labels: monthlyLabels,
+
             datasets: [{
                 label: "Net P/L ($)",
                 data: monthlyValues,
+
                 backgroundColor: monthlyValues.map(
                     value => value >= 0 ? "#16a34a" : "#dc2626"
                 ),
+
                 borderRadius: 6
             }]
         },
+
         options: {
             ...commonOptions,
+
             scales: {
                 x: {
                     ticks: {
                         color: mutedColor
                     },
+
                     grid: {
                         display: false
                     }
                 },
+
                 y: {
                     ticks: {
                         color: mutedColor,
                         callback: value => "$" + value
                     },
+
                     grid: {
                         color: borderColor
                     }
@@ -455,3 +499,4 @@ Dashboard | Forex Trading Journal
 </script>
 
 {% endblock %}
+```

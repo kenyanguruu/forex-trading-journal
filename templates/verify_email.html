@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}
+Verify Email | Forex Trading Journal
+{% endblock %}
+
+{% block content %}
+
+<section class="form-section auth-section">
+
+    <h2>Verify Your Email</h2>
+
+    <p class="auth-description">
+        We sent a six-digit verification code to
+        <strong>{{ email }}</strong>.
+        Enter the code below to activate your account.
+    </p>
+
+    <form method="POST" action="{{ url_for('verify_email') }}" class="otp-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+
+            <label>Verification Code</label>
+
+            <div class="otp-input-container">
+
+                {% for i in range(6) %}
+                <input
+                    type="text"
+                    class="otp-digit"
+                    maxlength="1"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    autocomplete="{% if loop.first %}one-time-code{% else %}off{% endif %}"
+                    aria-label="Verification digit {{ loop.index }}"
+                    required
+                >
+                {% endfor %}
+
+            </div>
+
+            <input
+                type="hidden"
+                id="otp"
+                name="otp"
+            >
+
+        </div>
+
+        <button type="submit" class="primary-button">
+            Verify Email
+        </button>
+
+    </form>
+
+    <form
+        method="POST"
+        action="{{ url_for('resend_otp') }}"
+        class="auth-links"
+    >
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <button type="submit" class="secondary-button">
+            Resend Verification Code
+        </button>
+
+    </form>
+
+    <div class="auth-links">
+        <a href="{{ url_for('login') }}">Back to Login</a>
+    </div>
+
+</section>
+
+<script src="{{ url_for('static', filename='js/otp-input.js') }}"></script>
+
+{% endblock %}

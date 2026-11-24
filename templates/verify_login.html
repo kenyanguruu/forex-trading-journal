@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}
+Verify Login | Forex Trading Journal
+{% endblock %}
+
+{% block content %}
+
+<section class="form-section auth-section">
+
+    <h2>Verify Your Login</h2>
+
+    <p class="auth-description">
+        We have sent a verification code to your email address:
+        <strong>{{ email }}</strong>
+    </p>
+
+    <form method="POST" action="{{ url_for('verify_login') }}" class="otp-form">
+         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+
+            <label>Verification Code</label>
+
+            <div class="otp-input-container">
+
+                {% for i in range(6) %}
+                <input
+                    type="text"
+                    class="otp-digit"
+                    maxlength="1"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    autocomplete="{% if loop.first %}one-time-code{% else %}off{% endif %}"
+                    aria-label="Verification digit {{ loop.index }}"
+                    required
+                >
+                {% endfor %}
+
+            </div>
+
+            <input
+                type="hidden"
+                id="otp"
+                name="otp"
+            >
+
+        </div>
+
+        <button type="submit">
+            Verify and Log In
+        </button>
+
+    </form>
+
+    <p class="auth-links">
+        Didn't receive your code?
+        <a href="{{ url_for('login') }}">Return to Login</a>
+    </p>
+
+</section>
+
+<script src="{{ url_for('static', filename='js/otp-input.js') }}"></script>
+
+{% endblock %}

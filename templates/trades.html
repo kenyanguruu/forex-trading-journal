@@ -171,11 +171,11 @@ My Trades | Forex Trading Journal
 
                     <td>{{ trade["Trade Date"] }}</td>
 
-                    <td>{{ trade.get("Broker") or "—" }}</td>
+                    <td>{{ trade.get("Broker") or "â€”" }}</td>
 
-                    <td>{{ trade.get("Account Type") or "—" }}</td>
+                    <td>{{ trade.get("Account Type") or "â€”" }}</td>
 
-                    <td>{{ trade.get("Broker Entity") or "—" }}</td>
+                    <td>{{ trade.get("Broker Entity") or "â€”" }}</td>
 
                     <td>{{ trade["Pair"] }}</td>
 
@@ -226,6 +226,7 @@ My Trades | Forex Trading Journal
                         <form method="POST"
                               action="{{ url_for('delete_trade_route', trade_id=trade['Trade ID']) }}"
                               onsubmit="return confirm('Are you sure you want to delete this trade? This action cannot be undone.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                             <button type="submit" class="danger-button">
                                 Delete

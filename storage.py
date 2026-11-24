@@ -1,187 +1,112 @@
-import csv
-import os
-import tempfile
 import uuid
 
-# --------------------------------------------------
-# FILE CONFIGURATION
-# --------------------------------------------------
-
-DATA_FOLDER = "data"
-CSV_FILE = os.path.join(DATA_FOLDER, "trades.csv")
-
-FIELDNAMES = [
-    "Trade ID",
-    "Broker",
-    "Account Type",
-    "Broker Entity",
-    "Pair",
-    "Direction",
-    "Entry Price",
-    "Exit Price",
-    "Lot Size",
-    "Contract Size",
-    "Price Decimals",
-    "Quote-to-USD Conversion Rate",
-    "Risk percentage",
-    "Results",
-    "Stop loss",
-    "Take profit",
-    "Profit/Loss",
-    "Risk-to-Reward",
-    "Trade Date",
-    "Trade Time",
-]
-
+from models import db, Trade
 
 # --------------------------------------------------
-# CREATE DATA FOLDER
+# TRADE STORAGE
 # --------------------------------------------------
 
 
-def ensure_data_folder():
-    os.makedirs(DATA_FOLDER, exist_ok=True)
+def load_trades(user_id):
+    """Load only trades belonging to the specified user."""
+
+    records = Trade.query.filter_by(user_id=user_id).all()
+
+    trades = []
+
+    for record in records:
+        trade = record.trade_data.copy()
+        trade["Trade ID"] = record.id
+        trades.append(trade)
+
+    return trades
 
 
-# --------------------------------------------------
-# LOAD TRADES
-# --------------------------------------------------
+def add_trade(trade, user_id):
+    """Save a new trade belonging to a specific user."""
 
+    trade_id = uuid.uuid4().hex
 
-def load_trades():
+    trade_data = trade.copy()
+    trade_data.pop("Trade ID", None)
 
-    ensure_data_folder()
-
-    if not os.path.exists(CSV_FILE):
-        return []
-
-    with open(CSV_FILE, "r", newline="", encoding="utf-8") as file:
-
-        reader = csv.DictReader(file)
-
-        if not reader.fieldnames:
-            return []
-
-        return list(reader)
-
-
-# --------------------------------------------------
-# SAVE ALL TRADES
-# --------------------------------------------------
-
-
-def save_trades(trades):
-
-    ensure_data_folder()
-
-    # Write to a temporary file first.
-    # Replace the original only after writing succeeds.
-
-    temp_path = None
+    new_trade = Trade(
+        id=trade_id,
+        user_id=user_id,
+        trade_data=trade_data,
+    )
 
     try:
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", newline="", encoding="utf-8", dir=DATA_FOLDER, delete=False
-        ) as file:
-
-            temp_path = file.name
-
-            writer = csv.DictWriter(
-                file,
-                fieldnames=FIELDNAMES,
-                extrasaction="ignore",
-            )
-
-            writer.writeheader()
-
-            for trade in trades:
-                writer.writerow({field: trade.get(field, "") for field in FIELDNAMES})
-
-        os.replace(temp_path, CSV_FILE)
-
+        db.session.add(new_trade)
+        db.session.commit()
     except Exception:
-
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
-
+        db.session.rollback()
         raise
 
-
-# --------------------------------------------------
-# ADD A TRADE
-# --------------------------------------------------
+    return trade_id
 
 
-def add_trade(trade):
+def get_trade_by_id(trade_id, user_id):
+    """Find a trade only if it belongs to the specified user."""
 
-    trades = load_trades()
+    record = Trade.query.filter_by(
+        id=trade_id,
+        user_id=user_id,
+    ).first()
 
-    trade["Trade ID"] = uuid.uuid4().hex
+    if record is None:
+        return None
 
-    trades.append(trade)
+    trade = record.trade_data.copy()
+    trade["Trade ID"] = record.id
 
-    save_trades(trades)
-
-    return trade["Trade ID"]
-
-
-# --------------------------------------------------
-# FIND A TRADE
-# --------------------------------------------------
-
-
-def get_trade_by_id(trade_id):
-
-    trades = load_trades()
-
-    for trade in trades:
-
-        if trade.get("Trade ID") == trade_id:
-            return trade
-
-    return None
+    return trade
 
 
-# --------------------------------------------------
-# UPDATE A TRADE
-# --------------------------------------------------
+def update_trade(trade_id, updated_data, user_id):
+    """Update a trade only if it belongs to the specified user."""
 
+    record = Trade.query.filter_by(
+        id=trade_id,
+        user_id=user_id,
+    ).first()
 
-def update_trade(trade_id, updated_data):
-
-    trades = load_trades()
-
-    for trade in trades:
-
-        if trade.get("Trade ID") == trade_id:
-
-            for field in FIELDNAMES:
-
-                if field != "Trade ID" and field in updated_data:
-                    trade[field] = updated_data[field]
-
-            save_trades(trades)
-
-            return True
-
-    return False
-
-
-# --------------------------------------------------
-# DELETE A TRADE
-# --------------------------------------------------
-
-
-def delete_trade(trade_id):
-
-    trades = load_trades()
-
-    updated_trades = [trade for trade in trades if trade.get("Trade ID") != trade_id]
-
-    if len(updated_trades) == len(trades):
+    if record is None:
         return False
 
-    save_trades(updated_trades)
+    trade_data = record.trade_data.copy()
+
+    for field, value in updated_data.items():
+        if field != "Trade ID":
+            trade_data[field] = value
+
+    record.trade_data = trade_data
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+    return True
+
+
+def delete_trade(trade_id, user_id):
+    """Delete a trade only if it belongs to the specified user."""
+
+    record = Trade.query.filter_by(
+        id=trade_id,
+        user_id=user_id,
+    ).first()
+
+    if record is None:
+        return False
+
+    try:
+        db.session.delete(record)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
 
     return True

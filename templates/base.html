@@ -14,7 +14,6 @@
 <body>
 
     <header class="main-header">
-
         <div class="header-container">
 
             <div class="brand">
@@ -29,10 +28,39 @@
             <nav class="main-navigation">
 
                 <a href="{{ url_for('home') }}">Home</a>
-                <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                <a href="{{ url_for('view_trades') }}">My Trades</a>
-                <a href="{{ url_for('trading_reports') }}">Reports</a>
-                <a href="{{ url_for('add_trade') }}">Add Trade</a>
+
+                {% if current_user.is_authenticated %}
+
+                    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                    <a href="{{ url_for('view_trades') }}">My Trades</a>
+                    <a href="{{ url_for('trading_reports') }}">Reports</a>
+                    <a href="{{ url_for('add_trade') }}">Add Trade</a>
+
+                    <form method="POST"
+                          action="{{ url_for('logout') }}"
+                          class="nav-logout-form">
+
+                        <input type="hidden"
+                               name="csrf_token"
+                               value="{{ csrf_token() }}">
+
+                        <button type="submit" class="nav-auth-button">
+                            Logout
+                        </button>
+
+                    </form>
+
+                {% else %}
+
+                    <a href="{{ url_for('login') }}" class="nav-auth-button">
+                        Login
+                    </a>
+
+                    <a href="{{ url_for('register') }}" class="nav-auth-button">
+                        Create Account
+                    </a>
+
+                {% endif %}
 
                 <div class="theme-control">
                     <label for="theme-select">Theme</label>
@@ -47,43 +75,58 @@
             </nav>
 
         </div>
-
     </header>
-
 
     <main class="main-content">
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
+        <!-- Flask messages: JavaScript will convert these into notifications -->
+        <div id="flash-messages"
+             class="flash-messages"
+             aria-live="polite"
+             aria-atomic="false">
 
-            {% if messages %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
 
-                {% for category, message in messages %}
+                {% if messages %}
 
-                    <div class="alert {{ category }}">
-                        {{ message }}
-                    </div>
+                    {% for category, message in messages %}
 
-                {% endfor %}
+                        <div class="alert {{ category }} flash-message"
+                             data-category="{{ category }}">
+                            {{ message }}
+                        </div>
 
-            {% endif %}
+                    {% endfor %}
 
-        {% endwith %}
+                {% endif %}
 
+            {% endwith %}
+
+        </div>
 
         {% block content %}
-
         {% endblock %}
 
     </main>
-
 
     <footer class="main-footer">
         <p>Forex Trading Journal &copy; 2026</p>
         <span>Track your trades. Improve your performance.</span>
     </footer>
 
+    <!-- Global notification container -->
+    <div id="notification-container"
+         class="notification-container"
+         aria-live="polite"
+         aria-atomic="false">
+    </div>
 
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/password-toggle.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+
+    {% block scripts %}
+    {% endblock %}
 
 </body>
 </html>

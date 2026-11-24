@@ -1,6 +1,7 @@
 # --------------------------------------------------
 # CURRENCY PAIR AND CONTRACT SIZE
 # --------------------------------------------------
+import math
 
 
 def get_contract_size(pair):
@@ -34,12 +35,25 @@ def get_contract_size(pair):
 
 def validate_trade(entry_price, stop_loss, take_profit, direction):
 
-    if direction == "BUY":
+    try:
+        entry_price = float(entry_price)
+        stop_loss = float(stop_loss)
+        take_profit = float(take_profit)
 
+    except (TypeError, ValueError):
+        return False
+
+    prices = [entry_price, stop_loss, take_profit]
+
+    if not all(math.isfinite(price) and price > 0 for price in prices):
+        return False
+
+    direction = str(direction).strip().upper()
+
+    if direction == "BUY":
         return stop_loss < entry_price < take_profit
 
     elif direction == "SELL":
-
         return stop_loss > entry_price > take_profit
 
     return False

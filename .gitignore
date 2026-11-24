@@ -12,3 +12,12 @@ venv/
 trades.csv
 trades.txt
 trades_backup.csv
+# Local databases
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Python environment
+.env.*
+!.env.example
