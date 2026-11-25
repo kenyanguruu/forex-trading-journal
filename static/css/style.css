@@ -2892,3 +2892,218 @@ button:disabled {
     border-color: #ef4444 !important;
     box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.12) !important;
 }
+/* --------------------------------------------------
+   COMPACT BUTTONS - DESKTOP AND MOBILE
+-------------------------------------------------- */
+
+button,
+.btn,
+input[type="submit"],
+input[type="button"] {
+    padding: 8px 14px;
+    font-size: 14px;
+    min-height: 36px;
+    border-radius: 6px;
+}
+
+/* Mobile button sizing */
+@media (max-width: 768px) {
+    button,
+    .btn,
+    input[type="submit"],
+    input[type="button"] {
+        padding: 7px 11px;
+        font-size: 13px;
+        min-height: 32px;
+    }
+}
+/* Authentication navigation buttons */
+
+.nav-auth-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.nav-logout-form {
+    margin: 0;
+}
+
+/* Small screens */
+@media (max-width: 768px) {
+
+    .main-navigation {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .nav-auth-actions {
+        width: auto;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-left: auto;
+        padding: 0;
+    }
+
+    .nav-auth-actions .nav-auth-button,
+    .nav-logout-form .nav-auth-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 36px;
+        padding: 7px 12px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+
+    .nav-logout-form {
+        display: flex;
+        align-items: center;
+        margin: 0;
+    }
+
+    .theme-control {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: auto;
+    }
+}
+
+/* =========================================
+   FINAL NAVIGATION ALIGNMENT FIX
+========================================= */
+
+.main-navigation {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.nav-right-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.nav-auth-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-logout-form {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+}
+
+.main-navigation .nav-auth-button,
+.nav-logout-form .nav-auth-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    height: 36px;
+    min-height: 36px;
+    padding: 0 13px;
+
+    box-sizing: border-box;
+    border: 1px solid var(--brand);
+    border-radius: 7px;
+
+    background: var(--brand);
+    color: #ffffff;
+
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.main-navigation .nav-auth-button:hover {
+    background: var(--brand-hover);
+    color: #ffffff;
+}
+
+.nav-logout-form .nav-auth-button:hover {
+    background: var(--brand-hover);
+}
+
+.theme-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+.theme-control select {
+    height: 36px;
+    min-height: 36px;
+    min-width: 95px;
+    padding: 0 9px;
+    margin: 0;
+    box-sizing: border-box;
+    font-size: 13px;
+}
+
+/* Mobile navigation */
+
+@media (max-width: 700px) {
+
+    .main-navigation {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .nav-right-controls {
+        margin-left: auto;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .nav-auth-actions {
+        justify-content: flex-end;
+        gap: 6px;
+    }
+
+    .main-navigation .nav-auth-button,
+    .nav-logout-form .nav-auth-button {
+        height: 34px;
+        min-height: 34px;
+        padding: 0 10px;
+        font-size: 12px;
+    }
+
+    .theme-control {
+        gap: 4px;
+    }
+
+    .theme-control label {
+        font-size: 12px;
+    }
+
+    .theme-control select {
+        height: 34px;
+        min-height: 34px;
+        min-width: 82px;
+        font-size: 12px;
+        padding: 0 7px;
+    }
+}

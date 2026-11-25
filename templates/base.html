@@ -25,6 +25,7 @@
                 </div>
             </div>
 
+                        
             <nav class="main-navigation">
 
                 <a href="{{ url_for('home') }}">Home</a>
@@ -36,43 +37,56 @@
                     <a href="{{ url_for('trading_reports') }}">Reports</a>
                     <a href="{{ url_for('add_trade') }}">Add Trade</a>
 
-                    <form method="POST"
-                          action="{{ url_for('logout') }}"
-                          class="nav-logout-form">
-
-                        <input type="hidden"
-                               name="csrf_token"
-                               value="{{ csrf_token() }}">
-
-                        <button type="submit" class="nav-auth-button">
-                            Logout
-                        </button>
-
-                    </form>
-
-                {% else %}
-
-                    <a href="{{ url_for('login') }}" class="nav-auth-button">
-                        Login
-                    </a>
-
-                    <a href="{{ url_for('register') }}" class="nav-auth-button">
-                        Create Account
-                    </a>
-
                 {% endif %}
 
-                <div class="theme-control">
-                    <label for="theme-select">Theme</label>
+                <div class="nav-right-controls">
 
-                    <select id="theme-select">
-                        <option value="dark">Dark</option>
-                        <option value="light">Light</option>
-                        <option value="system">System</option>
-                    </select>
+                    <div class="nav-auth-actions">
+
+                        {% if current_user.is_authenticated %}
+
+                            <form method="POST"
+                                action="{{ url_for('logout') }}"
+                                class="nav-logout-form">
+
+                                <input type="hidden"
+                                    name="csrf_token"
+                                    value="{{ csrf_token() }}">
+
+                                <button type="submit" class="nav-auth-button">
+                                    Logout
+                                </button>
+
+                            </form>
+
+                        {% else %}
+
+                            <a href="{{ url_for('login') }}" class="nav-auth-button">
+                                Login
+                            </a>
+
+                            <a href="{{ url_for('register') }}" class="nav-auth-button">
+                                Create Account
+                            </a>
+
+                        {% endif %}
+
+                    </div>
+
+                    <div class="theme-control">
+                        <label for="theme-select">Theme</label>
+
+                        <select id="theme-select">
+                            <option value="dark">Dark</option>
+                            <option value="light">Light</option>
+                            <option value="system">System</option>
+                        </select>
+                    </div>
+
                 </div>
 
             </nav>
+
 
         </div>
     </header>
